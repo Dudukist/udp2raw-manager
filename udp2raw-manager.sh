@@ -10,14 +10,15 @@ DOWNLOAD_URL="https://github.com/wangyu-/udp2raw-tunnel/releases/download/202007
 
 function install_udp2raw() {
   echo "⏬ Downloading udp2raw..."
-  cd /tmp
-  wget -O udp2raw.tar.gz "$DOWNLOAD_URL"
-  tar -xzf udp2raw.tar.gz
+  cd /tmp                                  # Change to temporary directory
+  wget -O udp2raw.tar.gz "$DOWNLOAD_URL"  # Download the binary archive
+  tar -xzf udp2raw.tar.gz                 # Extract archive
 
-  mv udp2raw_amd64 "$INSTALL_DIR/$BIN_NAME"
-  chmod +x "$INSTALL_DIR/$BIN_NAME"
+  mv udp2raw_amd64 "$INSTALL_DIR/$BIN_NAME"  # Move binary to /usr/local/bin
+  chmod +x "$INSTALL_DIR/$BIN_NAME"          # Make it executable
   echo "✅ Binary installed at $INSTALL_DIR/$BIN_NAME"
 
+  # Get user configuration
   read -p "Mode? (server/client): " MODE
   if [[ "$MODE" != "server" && "$MODE" != "client" ]]; then
     echo "❌ Invalid mode. Choose 'server' or 'client'."
@@ -28,6 +29,17 @@ function install_udp2raw() {
   read -p "Remote port (e.g. 22 for SSH): " REMOTE_PORT
   read -p "Password: " PASSWORD
 
+  # Choose raw-mode
+  echo "Select connection mode:"
+  select RAW_MODE in faketcp udp icmp; do
+    if [[ "$RAW_MODE" == "faketcp" || "$RAW_MODE" == "udp" || "$RAW_MODE" == "icmp" ]]; then
+      break
+    else
+      echo "❌ Invalid option. Choose 1, 2 or 3."
+    fi
+  done
+
+  # If client, ask for server IP
   if [[ "$MODE" == "client" ]]; then
     read -p "Server IP: " SERVER_IP
   fi
@@ -41,7 +53,7 @@ Description=udp2raw Server
 After=network.target
 
 [Service]
-ExecStart=$INSTALL_DIR/$BIN_NAME -s -l0.0.0.0:$LOCAL_PORT -r127.0.0.1:$REMOTE_PORT -k "$PASSWORD" --raw-mode faketcp
+ExecStart=$INSTALL_DIR/$BIN_NAME -s -l0.0.0.0:$LOCAL_PORT -r127.0.0.1:$REMOTE_PORT -k "$PASSWORD" --raw-mode $RAW_MODE
 Restart=on-failure
 
 [Install]
@@ -55,7 +67,7 @@ Description=udp2raw Client
 After=network.target
 
 [Service]
-ExecStart=$INSTALL_DIR/$BIN_NAME -c -l127.0.0.1:$LOCAL_PORT -r$SERVER_IP:$LOCAL_PORT -k "$PASSWORD" --raw-mode faketcp
+ExecStart=$INSTALL_DIR/$BIN_NAME -c -l0.0.0.0:$LOCAL_PORT -r$SERVER_IP:$LOCAL_PORT -k "$PASSWORD" --raw-mode $RAW_MODE
 Restart=on-failure
 
 [Install]
@@ -63,6 +75,7 @@ WantedBy=multi-user.target
 EOF
   fi
 
+  # Enable and start the service
   echo "✅ Enabling and starting service..."
   sudo systemctl daemon-reexec
   sudo systemctl daemon-reload
